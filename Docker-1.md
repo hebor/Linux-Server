@@ -393,32 +393,41 @@ docker image save -o images.gz hebor/httpd:box01 hebor/httpd:box03    #将多个
 
 docker的网络通信中，每创建一个容器，都会创建一个虚拟网卡，一头放在容器内，另一头接在docker0网桥上。docker0桥默认是一个NAT桥，每创建并启动一个容器时，会自动创建一个iptables规则。删除容器时也会自动将iptables规则删除
 
-
 ```shell
 # brctl show    #查看网桥上关联的端口
 ```
 
 ### ip命令操作网络名称空间
-示例：创建网络名称空间
-```shell
-# ip netns add r1		创建两个netns
-# ip netns add r2
-# ip netns list			查看创建的netns
-# ip netns exec r1 ip add	在netns里执行ip命令
-```
-注：使用ip命令模拟的网络名称空间，**除了网络名称空间是隔离的，其他的都是共享的**
 
-示例：配置虚拟网卡接口
+上述二层、三层网络通信都是基于网络名称空间进行理解，实际上在CentOS7系统中有自带的一个iproute工具包，这个包里有一个ip工具，在它的众多参数中存在一个netns，通过netns能够操作网络名称空间来模拟容器间通信。**使用ip命令管理网络名称空间时，只有网络名称空间是隔离的，其他名称空间都是共享的**
+
+
 ```shell
-# ip link add name veth1.1 type veth peer name veth1.2			创建虚拟网卡接口，指定veth1.1的对端接口名称为veth1.2
-# ip link show												查看虚拟网卡接口
-# ip link set dev veth1.1 netns r1							将虚拟网卡的veth1.1端放至netns r1中
-# ip netns exec r1 ip link set dev veth1.1 name eth0		将netns中的虚拟网卡接口改名为eth0
-# ifconfig veth1.2 10.250.1.5/24 up							为物理设备上的veth1.2配置临时地址
-# ip netns exec r1 ifconfig eth0 10.250.1.6/24 up			为netns内的veth1.1配置临时地址
-# ping 10.250.1.6											测试物理设备与netns通信是否正常
+# 1.创建网络名称空间
+[root@base ~]# ip netns help    #查看帮助手册
+[root@base ~]# ip netns add r1  #创建两个netns
+[root@base ~]# ip netns add r2
+[root@base ~]# ip netns list    #查看创建的netns
+[root@base ~]# ip netns exec r1 ifconfig -a   #在netns里执行命令查看网卡
+
+# 2.配置虚拟网卡接口
+[root@base ~]# ip link add name veth1.1 type veth peer name veth1.2
+    #创建虚拟网卡接口对，指定veth1.1的对端接口名称为veth1.2，默认两个veth接口都在宿主机上且都未激活
+[root@base ~]# ip link show     #查看虚拟网卡接口
+[root@base ~]# ip link set dev veth1.1 netns r1     #设置虚拟网卡的veth1.1属于网络名称空间r1
+[root@base ~]# ip netns exec r1 ip link set veth1.1 name eth0   #将netns中的虚拟网卡接口改名为eth0
+[root@base ~]# ifconfig veth1.2 192.168.42.2/24 up  #为物理设备上的veth1.2配置临时地址
+[root@base ~]# ip netns exec r1 ifconfig eth0 192.168.42.1/24 up    #为netns内的eth0配置临时地址
+[root@base ~]# ping 192.168.42.1    #测试物理设备与netns通信是否正常
+
+# 3.测试两个名称空间之间的通信
+[root@base ~]# ip link set veth1.2 netns r2     #将虚拟网卡连接到r2
+[root@base ~]# ip netns exec r2 ifconfig veth1.2 192.168.42.2/24 up
+[root@base ~]# ip netns exec r2 ping 192.168.42.1
 ```
-补充：将物理机上的虚拟网卡的另一半放至netns r2中则变成r1与r2通信。将虚拟网卡接口移到netns中默认是不激活的。如果失误将虚拟网卡的两个接口都放至一个netns中了，则使用以下命令将接口移出
+
+创建netns后如果没有给它指定网卡，那么在netns内就应该只有一个本地回环口lo。通过ip命令也能够创建虚拟网卡对，将虚拟网卡手动连接到名称空间中。将物理机上的虚拟网卡的另一半放至netns r2中则变成r1与r2通信。将虚拟网卡接口移到netns中默认是不激活的。如果失误将虚拟网卡的两个接口都放至一个netns中了，则使用以下命令将接口移出
+
 ```shell
 # ip netns exec r1 ip link set dev veth1.1 netns r2
 ```
