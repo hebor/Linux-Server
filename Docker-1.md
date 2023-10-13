@@ -112,19 +112,13 @@ Docker容器本身与主机并没有绑定关系，当容器的数据都挂载�
 docker 自主研发的容器引擎：libcontainer --> runC
 
 
-
-
-
-
-
-
 # Docker基本用法
 
 由上一小节可知，要想使用Linux容器，在内核级至少支持两种技术：namespaces和CGroups，然后再借助用户空间的一些工具，利用内核级所提供的技术，从而实现运行容器。而Docker通过镜像技术在简化容器运行的道路上更进一步，在Docker的主导下产生了OCI（Open Container Initiative）和OCF（Open Container Format）的标准
 
 OCI的主要目的在于围绕容器格式和运行时制定一个开放的工业化标准，OCI的标准由2部分组成，runtime-spec（容器运行时标准）和image-spec（镜像格式标准），这是两种不同标准。再后来就产生了OCF格式，runC是OCF的重要实现之一，runC也是较新版本中Docker所使用的容器引擎
 
-Docker专门提供了一个容纳容器镜像的站点[dockerhub](hub.docker.com)，使用Docker拉取或运行一个容器，默认都会从这个镜像仓库下载镜像
+Docker专门提供了一个容纳容器镜像的站点dockerhub，使用Docker拉取或运行一个容器，默认都会从这个镜像仓库下载镜像
 
 ## Docker的架构
 
@@ -161,14 +155,9 @@ Docker服务端开启端口监听`dockerd -H IP:PORT`, 客户端通过指定IP�
 容器是动态的，它有自己的生命周期，镜像是静态的，一个镜像可以启动多个容器；两者的关系类似于Linux上的进程与程序之间的关系，程序本身是静态的，程序被执行时就产生了进程，每个进程都具备自己的生命周期，进程的启动依赖程序，正如容器的启动依赖镜像
 
 ### Docker安装
-
-![Docker安装-1](https://www.z4a.net/images/2023/02/01/Docker-1.png)
-
-![Docker安装-2](https://www.z4a.net/images/2023/02/01/Docker-2.png)
-
-![Docker安装-3](https://www.z4a.net/images/2023/02/01/Docker-3.png)
-
-![Docker安装-4](https://www.z4a.net/images/2023/02/01/Docker-4.png)
+![Docker安装-1](https://www.z4a.net/images/2023/09/27/Docker-1.png)
+![Docker安装-2](https://www.z4a.net/images/2023/09/27/Docker-2.png)
+![Docker安装-3](https://www.z4a.net/images/2023/09/27/Docker-3.png)
 
 按照官网步骤安装即可。Docker安装完毕不需要经过任何修改就可以启动Docker服务，Docker的配置文件默认是不存在的，需要手动创建，实际上也就是配置镜像加速的过程。Docker镜像加速除了docker-cn，还可以使用阿里云和中科大提供的镜像加速服务。从示例的daemon.json文件中可以看出json语法是一个数组，这意味着可以通过逗号隔开添加多个镜像加速地址
 
@@ -228,7 +217,7 @@ docker container inspect first_container    # 查看容器的详细信息，可�
 curl 172.17.0.2 # 宿主机访问容器
 ```
 
-进入容器后，通过ps命令查看当前进程可以看到，容器内PID为1的进程是sh，这也就是busybox镜像默认执行的主程序，通过exec进入容器后执行ps命令，可以看到除了默认的sh进程以外，还有一个/bin/sh进程，这是exec执行的命令；由于busybox镜像默认执行的/bin/sh进程，当使用exit退出容器时，该容器会停止运行，可以重新启动该容器，如果容器内运行的主进程是/bin/sh进程，使用`container start -ia`启动进程时能够直接进入容器
+进入容器后，通过ps命令查看当前进程可以看到，容器内PID为1的进程是sh，这也就是busybox镜像默认执行的主程序。在新窗口通过exec进入容器后执行ps命令，可以看到除了默认的sh进程以外，还有一个/bin/sh进程，这是exec执行的命令；由于busybox镜像默认执行的/bin/sh进程，当使用exit退出容器时，该容器会停止运行，可以重新启动该容器，如果容器内运行的主进程是/bin/sh进程，使用`container start -ia`启动进程时能够直接进入容器
 
 ```shell
 docker container run --name web1 -d nginx:1.14-alpine
@@ -237,13 +226,7 @@ docker container ls
 
 通过ls命令可以看到nginx容器默认执行的程序是`nginx -g 'daemon off'`，该程序的意思是不执行在后台。这是因为任何执行在容器中的程序都不能在后台执行，否则会被docker认定为进程已停止，继而结束这个容器，这就会造成容器运行即停止的情况。**一个容器的主程序就是这个容器的骨架，如果主程序运行在后台，那么该容器将无意义**
 
-此处概念容易与`docker container -d`选项混淆，`-d`选项表示将整个容器运行在系统的后台，`deamon off`表示容器内的主程序不能运行在容器后台
-
-
-
-
-
-
+此处概念容易与`docker container -d`选项混淆，`-d`选项表示将整个容器运行在系统的后台，没有`-d`选项启动nginx容器时会占用当前ssh会话窗口，`deamon off`表示容器内的主程序不能运行在容器后台
 
 
 # docker镜像管理基础
@@ -257,7 +240,7 @@ Docker镜像含有容器所需要的文件系统及其内容，且采用**分层
 
 ## 分层构建、联合挂载
 
-Docker的镜像并不是传统的iso镜像，其每个镜像都分成了许多层，每一层都是只读层，使用镜像时就是将这些分层挂载到了一起，从外面看起来就像是一个镜像，每个低层镜像都是高层镜像的父镜像，启动容器时必须将所有层级镜像逐层启动。镜像的所有层都是只读层，但容器必定会产生数据，所以在创建容器时，只读层全部挂载完毕后还会在最顶层额外挂载一个读写层，这个读写层随着容器的消亡而消亡
+Docker的镜像并不是传统的iso镜像，其每个镜像都分成了许多层，每一层都是只读层，使用镜像时就是将这些分层叠加挂载到了一起，从外面看起来就像是一个镜像，每个低层镜像都是高层镜像的父镜像，启动容器时必须将所有层级镜像逐层启动。镜像的所有层都是只读层，但容器必定会产生数据，所以在创建容器时，只读层全部挂载完毕后还会在最顶层额外挂载一个读写层，这个读写层随着容器的消亡而消亡
 
 以一个nginx镜像为例，假设一个nginx镜像由centos+nginx这2个镜像层组成，那么centos层必然会作为nginx层的下层镜像，也就是父镜像，同时它也处于整体镜像的最底层，启动nginx容器时，centos层和nginx层会联合挂载到一起，且从下层镜像开始往上逐层启动，启动镜像过程具备先后顺序
 
@@ -279,7 +262,6 @@ docker pull <registry>[:<port>]/[<namespace>/]<name>:<tag>
 - Private Registry：通过设有防火墙和额外的安全层的私有实体提供的registry
 
 #### repository
-Repository
 - 由特定的docker镜像的所有迭代版本组成的镜像仓库
 - 一个registry中可存在多个repository
 	- repository可分为"顶层仓库"和"用户仓库"
@@ -308,16 +290,16 @@ docker image tag hebor/httpd:box01 hebor/httpd:latest	#多标签
 docker rmi hebor/httpd:latest    #删除标签
 ```
 
-基于容器制作镜像时并不是制作了一个完整的镜像，而是将容器的读写层的修改内容单独制作成了一个镜像
+基于容器制作镜像时并不是制作了一个完整的镜像，而是将容器的读写层的修改内容单独制作成了一个镜像。注意：
 
-注：
-	1. 制作镜像时不指定仓库和标签，则此镜像仓库和tag都为空，这种镜像也被称为虚悬镜像
-	2. tag选项也可以添加标签，可以为一个镜像打上多个标签，类似硬链接，删除标签时不会删除镜像
+1. 制作镜像时不指定仓库和标签，则此镜像仓库和tag都为空，这种镜像也被称为虚悬镜像
+
+2. tag选项也可以添加标签，可以为一个镜像打上多个标签，类似硬链接，删除标签时不会删除镜像
 
 新镜像制作成功了，但是使用镜像启动容器时的默认命令却没有更改，使用以下命令查看默认启动的命令：
 
 ```shell
-# docker inspect hebor/httpd:box01    #查看Cmd
+docker inspect hebor/httpd:box01    #查看Cmd
 ```
 
 commit选项自带了一个参数用于更改默认启动命令
@@ -365,16 +347,10 @@ docker image save -o images.gz hebor/httpd:box01 hebor/httpd:box03    #将多个
 示例：镜像解包
 
 ```shell
-# docker image load -i images.gz    #镜像解包
+docker image load -i images.gz    #镜像解包
 ```
 
 使用save打包镜像时仅打包了容器的读写层镜像，所以导入镜像之前，主机上需要下载好对应的base image，否则直接运行解包的镜像时还是会先pull基础镜像
-
-
-
-
-
-
 
 # 虚拟化网络
 
@@ -394,10 +370,10 @@ docker image save -o images.gz hebor/httpd:box01 hebor/httpd:box03    #将多个
 docker的网络通信中，每创建一个容器，都会创建一个虚拟网卡，一头放在容器内，另一头接在docker0网桥上。docker0桥默认是一个NAT桥，每创建并启动一个容器时，会自动创建一个iptables规则。删除容器时也会自动将iptables规则删除
 
 ```shell
-# brctl show    #查看网桥上关联的端口
+brctl show    #查看网桥上关联的端口。在RHEL8版本中brctl命令已经被移除
 ```
 
-### ip命令操作网络名称空间
+**ip命令操作网络名称空间**
 
 上述二层、三层网络通信都是基于网络名称空间进行理解，实际上在CentOS7系统中有自带的一个iproute工具包，这个包里有一个ip工具，在它的众多参数中存在一个netns，通过netns能够操作网络名称空间来模拟容器间通信。**使用ip命令管理网络名称空间时，只有网络名称空间是隔离的，其他名称空间都是共享的**
 
@@ -426,125 +402,236 @@ docker的网络通信中，每创建一个容器，都会创建一个虚拟网�
 [root@base ~]# ip netns exec r2 ping 192.168.42.1
 ```
 
-创建netns后如果没有给它指定网卡，那么在netns内就应该只有一个本地回环口lo。通过ip命令也能够创建虚拟网卡对，将虚拟网卡手动连接到名称空间中。将物理机上的虚拟网卡的另一半放至netns r2中则变成r1与r2通信。将虚拟网卡接口移到netns中默认是不激活的。如果失误将虚拟网卡的两个接口都放至一个netns中了，则使用以下命令将接口移出
+创建netns后如果没有给它指定网卡，那么在netns内就应该只有一个本地回环口lo，通过ip命令也能够创建虚拟网卡对，可以将虚拟网卡手动连接到名称空间中，也可以将物理机上的虚拟网卡的另一半放至netns r2中则变成r1与r2通信。虚拟网卡接口移到netns中默认是不激活的，如果失误将虚拟网卡的两个接口都放至一个netns中了，则使用以下命令将接口移出
 
 ```shell
-# ip netns exec r1 ip link set dev veth1.1 netns r2
+[root@base ~]# ip netns exec r1 ip link set dev veth1.1 netns r2
 ```
 
-### docker容器端口映射{#index1}
-默认情况下容器对外的网络通信是没有问题的，但如果想要由外向内访问容器，则需要将容器暴露出去。将容器端口与主机端口做映射，就相当于做DNAT，端口映射的方式有5种：
+### docker容器端口映射
+
+默认情况下容器对外的网络通信是没有问题的，但如果想要由外向内访问容器，则需要将容器暴露出去。将容器端口与主机端口做映射，就相当于做DNAT，端口映射的方式有4种：
+
 ```shell
 -p <containerPort>    #将指定的容器端口映射至主机所有地址的一个动态端口
 -p <hostPort>:<containerPort>    #将容器端口映射至指定的主机端口
 -p <ip>::<containerPort>    #将指定的容器端口映射至主机的某一个IP的动态端口
 -p <ip>:<hostPort>:<containerPort>    #将容器端口映射至主机的某个IP的指定端口
 	"动态端口"指随机端口，具体的映射使用docker port命令查看
--P 映射所有端口。这里的所有端口是指，构建镜像时要开放的所有端口。基于镜像启动容器时默认不会暴露端口。
+
+-P 映射所有端口。这里的所有端口是指，构建镜像时在镜像文件中配置的要开放的所有端口，默认基于镜像启动容器时默认不会暴露端口，例如nginx镜像在默认启动时一定暴露了80端口
 ```
-查看端口映射[示例](#index2)
 
+#### docker的四种网络模型
+**1.closed container**
 
-### docker的四种网络模型
-示例：查看bridge网络详细信息
+封闭式容器，不为此容器的网络名称空间创建任何的网络设备，只有一个lo环回接口 
+
 ```shell
-# docker network inspect bridge 
+#创建一个封闭式容器，并为此容器指定主机名，此容器创建完成后仅有一个lo口
+docker container run --name t1 --network none -it --rm -h t1.example.com busybox
 ```
 
-#### 1.closed container
-封闭式容器，不为此容器的网络名称空间创建任何的网络设备，只有一个lo环回接口 <br />
-示例：
+**2.bridge container**
+
+桥接式容器，通过nat的方式将容器和docker0网桥连接。为容器创建虚拟网卡，一半在容器中，一半接在docker0桥上。对比封闭式容器，桥接式容器允许与外部网络通信，即便在默认情况下容器无法与宿主机以外的主机通信，但至少宿主机上的容器之间能够正常保持通信，而节点间通信能够使用主机名或域名解析，容器默认的主机名就是容器ID，默认的DNS解析与宿主机一致
+
 ```shell
-# docker container run --name t1 --network none -it --rm -h t1.example.com busybox
-	创建一个封闭式容器，并为此容器指定主机名，此容器创建完成后仅有一个lo口
+#创建一个桥接容器，指定主机名、dns服务器IP和搜索域，--add-host表示添加hosts文件解析条目。默认情况下，创建容器时指定主机名，Docker会将指定的主机名的映射自动添加到/etc/hosts文件中
+docker container run --name t1 -it --rm --network bridge --hostname busy.example.com --dns 114.114.114.114 --dns-search example.com --add-host centos.example.com:172.17.0.3 busybox:latest
+
+#将nginx服务的80端口映射到主机所有地址的随机高端口
+docker container run --name ng1 -d --network bridge -p 80  nginx:latest
+docker kill ng1		#杀死ng1容器
+
+#将nginx服务的80端口映射到主机所有地址的80端口
+docker container run --name ng1 -d --rm --network bridge -p 80:80 nginx:latest
+
+#将nginx服务的80端口映射到主机指定地址的随机高端口
+docker container run --name ng1 -d --rm --network bridge -p 172.21.147.140::80 nginx:latest
+docker port ng1    #查看端口映射
+
+#指定地址和端口映射容器端口
+docker container run --name t5 -d -p 10.250.1.11:6000:80 --rm nginx
+docker network inspect bridge		#查看bridge网络详细信息
 ```
 
-#### 2.bridge container{#index2}
-桥接式容器，通过nat的方式将容器和docker0网桥连接。为容器创建虚拟网卡，一半在容器中，一半接在docker0桥上
-示例：包括[端口映射](#index1)
-```shell
-# docker container run --name t2 -it --rm --network bridge --dns 114.114.114.114 --dns-search example.com busybox
-	创建一个桥接容器，指定dns服务器和域名
-	--add-host centos.example.com:10.250.1.11    添加hosts文件解析条目
+**3.joined container**
 
-# docker container run --name t3 -d --network bridge -p 80  nginx
-	将nginx服务的80端口映射到主机所有地址的随机高端口
-
-# docker container run --name t4 -p 10.250.1.11::80 --rm nginx
-	将nginx服务的80端口映射到主机指定地址的随机高端口
-# docker port t4	查看端口映射
-80/tcp -> 10.250.1.11:32769
-
-# docker container run --name t5 -d -p 10.250.1.11:6000:80 --rm nginx
-	指定地址和端口映射容器
-```
-
-#### 3.joined container
 联盟式容器，将一部分namespaces隔离(User,Mounted,Pid)，UTS、IPC、NET则共享，在docker上表现为host网络
-示例：创建两个联盟容器
+
 ```shell
-# docker container run --name t6 -it --rm busybox
-	先创建一个桥接容器
-# docker container run --name t7 -it --rm --network container:t6 busybox
-	创建容器指定网络是t6的容器网络。查看t6和t7的ip，此两个容器的ip共享
+#先创建一个桥接容器
+docker container run --name box1 -d -it --network bridge busybox:latest
+
+#创建容器指定网络是box1的容器网络。查看bo1和box2的ip，此两个容器的ip共享
+docker container run --name box2 --network container:box1 -it busybox:latest
 ```
 
-#### 4.open container
-开放网络，直接共享物理机的namespaces
-示例：共享主机网络
+**4.open container**
+
+开放网络，直接共享物理机的namespaces，它所能看到的网卡是物理网络接口，在容器内启动的服务会直接监听物理机的IP端口
+
 ```shell
-# docker container run --name t8 -it --rm --network host busybox
-	共享主机网络启动容器。ifconfig查看网络与主机网络一致，启动http服务可直接通过主机地址访问
+#共享主机网络启动容器。ifconfig查看网络与主机网络一致，启动http服务可直接通过主机地址访问
+docker container run --name box3 -it --rm --network host busybox:latest
+/ # httpd -f -h /data/html/		#在容器内启动httpd服务通过宿主机地址能够直接访问
 ```
 
 ### 自定义docker网桥
-更改docker0桥的网段，和其他的网络属性信息。创建新的docker桥，比如docker1
 
-#### 更改docker0桥的属性
-更改docker0桥的属性文件路径：/etc/docker/daemon.json
-```shell
+docker0网桥默认情况下使用172.17.0.0/16网络，根据实际需求能够修改docker0桥的所属网络，或重新创建一个新的网桥分别使用不同网段的地址
+
+#### 自定义docker0桥
+
+自定义docker0网桥的属性信息需要修改/etc/docker/daemon.json文件
+
+```json
+vim /etc/docker/daemon.json
 {
-        "bip": "192.168.42.1/24",
-        "mtu": 1500
-        "dns": ["114.114.114.114","8.8.8.8"]
+	"registry-mirrors":["https://registry.docker-cn.com"],
+	"bip": "192.168.42.1/24",
+	"mtu": 1500,
+	"default-gateway": "192.168.42.254",
+	//"default-gateway-v6": "2001:db8:abcd::89",	设置ipv6网关
+	"dns": ["114.114.114.114","8.8.8.8"]	//dns列表
+
 }
 ```
-bip为核心选项，bridge ip，用于指定docker0桥本身的地址，其他选项可通过此地址计算得出
+bip是核心选项，即bridge ip，用于指定docker0桥本身的地址，其他选项可通过此地址计算得出，docker0会自动为该网络配置dhcp
 
 #### 容器的远程连接
-docker0守护进程的C/S，默认仅监听Unix Socket格式的地址：/var/run/docker.sock。而Unix Socket文件只支持本地通信，如果想从docker0监听docker1的容器，默认是不可以的。docker客户端命令通信连接服务器时会用到**-H**选项，指定要连接的docker服务器，如果不指，默认指向/var/run/docker.sock文件。 <br />
+
+docker0守护进程的C/S，默认仅监听Unix Socket格式的地址：/var/run/docker.sock。而Unix Socket文件只支持本地通信，如果想从docker0监听docker1的容器，默认是不可以的。docker客户端命令通信连接服务器时会用到**-H**选项，指定要连接的docker服务器，如果不指，默认指向/var/run/docker.sock文件
+
 如果想要docker服务器允许外部的连接，那就需要监听一个正常的tcp端口，在这里有很多教程会选择在/etc/docker/daemon.json文件中添加一行配置：
+
 ```shell
 "hosts": ["tcp://0.0.0.0:2375","unix:///var/run/docker.sock"]
 ```
-注：
-```diff
-- /etc/docker/daemon.json会被docker.service的配置文件覆盖，直接添加daemon.json不起作用，还可能导致docker服务起不来
-```
-此处应该编辑docker服务的配置文件：/lib/systemd/system/docker.servcie
+
+注：/etc/docker/daemon.json会被docker.service的配置文件覆盖，直接添加daemon.json不起作用，还可能导致docker服务起不来。此处应该编辑docker服务的配置文件：/lib/systemd/system/docker.servcie
+
 ```shell
+#更改此选项，为了防止出错，应注释原有选项后重新编辑
 ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H unix://var/run/docker.sock
-	更改此选项，为了防止出错，应注释原有选项后重新编辑
 ```
+
 重启docker服务后，从其他安装了docker的主机可以访问本机的docker服务
 示例：查看远程主机上的镜像
+
 ```shell
-# docker -H 10.250.1.11:2375 images
+docker -H 10.250.1.11:2375 images
 ```
 
 #### 创建新的docker桥
+
 docker支持的网络插件可以通过docker info命令查看Network项，目前docker Network项包括了6种：bridge、host、ipvlan、macvlan、null、overlay
-示例：创建一个bridge网桥
+
 ```shell
-# docker network create -d bridge --subnet "172.26.0.0/16" --gateway "172.26.0.1" mybr0
+#创建一个新网桥
+docker network create -d bridge --subnet "172.26.0.0/16" --gateway "172.26.0.1" mybr0
 	-d：指定驱动类型
 	--subnet：指定ipv4子网
 	--gateway：网关
 	mybr0：网桥名称
 
-# docker network ls    查看网桥信息
-
-# docker container run --name t9 -it --rm --network mybr0 busybox
-	创建容器连接到自定义的网桥
+docker network ls    #查看网桥信息
+docker container run --name box1 -it --rm --network mybr0 busybox	#创建容器连接到自定义的网桥
 ```
-ifconfig也能够看到mybr0的网桥，只不过名字是随机的，可以通过ip命令更改名称
+
+ifconfig能够看到mybr0的网桥，不过mybr0网桥的网络接口名称是随机的，可以通过ip命令更改名称
+
+# docker 存储卷
+
+对于容器而言，它的启动依赖于底层的多个镜像的联合挂载，所有的底层镜像都是只读镜像，通过联合挂载后在只读镜像的最上层生成一个读写层，所有在容器中执行的操作都保存在读写层中。而对于下层镜像的操作，例如删除一个镜像中已有的文件，需要借助**写时复制（COW）**机制实现
+
+如果运行中的容器修改了一个已存在的文件，那该文件将会从只读层复制到读写层，该文件的只读版本仍然存在，但会隐藏起来，转而只显示修改后的文件。对已存在文件执行删除操作也是类似的，在容器中只会对该文件标记为已删除，对最上层的用户不可见，但只读镜像中并不会真正删除该文件，以上就是COW机制实现的功能
+
+且不论哪些文件到底是对用户不可见，写时复制的I/O机制在效率上就比较低下，毕竟基于多个镜像只读层，不断对不同只读层的文件做隐藏，也不是真正的删除，如果遇到对底层I/O要求较高的服务，则需要使用存储卷的方式实现I/O读写
+
+## 存储卷（volume）
+
+对于运行有重要业务的容器而言，例如数据库，且不论容器关闭时其数据一定会丢失，COW的I/O效率也无法满足数据库的要求，存储卷能够绕过COW的限制，且将数据保存在宿主机的磁盘上。存储卷可以简单理解为，在宿主机的文件系统中准备一个目录，并将该目录与容器内文件系统上的某一个目录建立绑定关系，随后容器中的进程向这个目录写入数据时，是直接写在宿主机的目录下的
+
+此前提及对于Mount名称空间相对容器而言应该是隔离的，而存储卷实现了原本隔离的两个Mount命称空间，在某个子路径上建立一定程度的绑定关系，使得多个容器之间能够实现一定的共享的效果
+
+通过存储卷的特性绕过容器本身的文件系统的限制，实现了脱离容器的生命周期的数据持久性，即便容器被关闭或删除，保存在存储卷中的数据默认是不会删除的，再次创建容器时引用此存储卷，可以较大程度上还原原本的容器。如果此存储卷所在的后端存储是一个共享存储，那任意一台连接此后端存储的主机都能够再次调度此容器
+
+容器与存储卷的关系比较类似于进程的运行逻辑，进程本身不保存任何数据，数据都保存在进程之外的文件系统上或专业的存储服务上，进程每次终止就会消失，本地保留的只有进程所属的进程文件，对容器而言也是如此，容器本身可以当作一个具备生命周期的动态对象，容器停止时就是被删除的时候，但本地镜像文件仍在，基于镜像可以再启动该容器
+
+### 存储卷的两种类型
+
+**bind mount volume**
+
+绑定挂载卷需要在容器和宿主机上都要手动指定一个目录，使两个已知路径建立关联关系
+
+```shell
+# 将宿主机的/mnt/valumes/box1/目录绑定到容器的/data/目录，指定的宿主机路径如果不存在则会自动创建
+docker container run --name box1 --rm -it -v /mnt/volumes/box1/:/data/ busybox:latest
+```
+
+**docker-managed volume**
+
+docker管理卷，只需要在容器上指定一个目录，而宿主机上则会由docker引擎新建一个随机目录或使用一个已存在的目录与容器的存储卷路径建立关联关系。使用docker管理卷时需要注意，如果删除了容器，那么下一次想引用此存储卷时，则需要用绑定挂载卷的方式引用，否则docker引擎会创建一个新的目录作为存储卷路径
+
+```shell
+# 容器上指定/data/目录为存储卷路径
+docker container run --name box1 -it --rm -v /data/ busybox
+# 查看容器详细信息，关注Mounts字段下的信息
+docker container inspect box1
+```
+
+由于docker是使用GO语言开发的，所以在使用inspect查看容器的详细信息时也可以通过GO模板过滤数据
+
+```shell
+# 检索Mounts挂载的总览信息
+docker container inspect -f {{.Mounts}} box1
+	-f：使用GO模板语言格式
+	.Mounts：.表示从根目录开始，.Mounts表示根目录下的Mounts项
+# 检索容器的IP地址
+docker container inspect -f {{.NetworkSettings.IPAddress}} box1
+```
+
+### 容器共享存储卷
+
+既然一个容器的目录能够与宿主机上的目录建立关联关系，那么多个容器都关联到宿主机的同一个目录，即可通过一个存储卷实现多个容器之间共享数据。创建容器时可以直接连接到其他容器在宿主机上的存储卷
+
+```shell
+# 启动第二个容器，使用box1容器的存储卷路径
+docker container run --name box2 --rm -it -v /mnt/volumes/box1/:/data/ busybox:latest
+# 另一种方式共享box1容器的存储卷
+docker container run --name box3 --rm -it --volumes-from box1 busybox:latest
+# 容器间共享NET、IPC、UTS和存储卷
+docker container run --name box4 --rm -it --network container:box1 --volumes-from box1 busybox
+```
+
+共享网络和存储卷的方式可以实现多个容器组合对外提供服务，仅需一个容器对外提供接口，例如nginx容器，其他容器可以监听本地socket接口，例如tomcat或数据库服务，存储卷能够更好的实现对容器的管理和数据的持久保存
+
+private registry
+================
+
+docker默认拒绝使用http访问registry，为了快速创建私有registry，docker专门提供的一个程序包：docker-distribution，且在dockerhub上也有registry的容器仓库，运行registry容器必须为其定义一个存储卷，且此存储卷应该时共享存储。
+```shell
+# yum install  docker-registry -y	#实际安装过程安装的还是docker-distribution包
+# rpm -ql docker-distribution		#查看配置文件路径、镜像存储路径、服务名称
+# vim /etc/docker-distribution/registry/config.yml	#修改镜像存储路径
+# systemctl start docker-distribution.service	#启动服务，默认使用5000端口
+```
+直接使用本地地址是可以上传镜像的，但如果非本地地址，又不是https协议，则需要修改/etc/docker/daemon.json文件
+```shell
+"insecure-registries": ["10.250.1.11:5000"]	#添加此行，IP地址可以更改为域名
+```
+重启docker服务后，修改镜像仓库名称，上传镜像即可
+
+harbor
+------
+
+harbor的项目代码托管在github上，在安装harbor之前需要确认主机上已经安装了docker和docker-compose，确切的版本要求github上面也明确[要求](https://github.com/goharbor/harbor)了
+[harbor配置文件信息](https://goharbor.io/docs/2.0.0/install-config/configure-yml-file/)<br />
+配置文件中分为必要配置和可选配置，必要配置至少要修改主机名，可以选择性修改harbor的管理员密码和数据库密码，如果没有为https配置证书，那https的内容需要注释，否则会报错<br />
+[harbor脚本安装](https://goharbor.io/docs/2.0.0/install-config/run-installer-script/)<br />
+直接运行安装脚本即可，安装完成后查看端口是否开放
+```diff
+- harbor.yml文件中开放的端口号必须要与/etc/docker/daemon.json文件中的端口号相同，否则即便安装完成也无法登录web
+```
