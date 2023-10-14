@@ -93,7 +93,9 @@ FROM busybox:latest
 #MAINTAINER "HeBor <hebo1248@163.com>"
 LABEL maintainer="HeBor <hebo1248@163.com>"
 COPY index.html /data/web/html/
+COPY yum.repos.d /etc/yum.repos.d/
 
+cp -r /etc/yum.repos.d/ /srv/hebor/	#宿主机拷贝目录到工作目录下
 vim /srv/hebor/index.html	#新建宿主机文件
 <h1>Busybox http server</h1>
 
@@ -102,32 +104,36 @@ docker container run --rm http:v0.1 cat /data/web/html/index.html
 	#启动容器，仅执行cat命令，退出删除容器。这种方式会改变镜像原本要运行的默认主程序，执行完cat命令后就会退出容器
 ```
 
+在Dockerfile文件中，同一个指令可以出现多次多行，但每一条指令都会生成一个新的镜像层，所以在编写Dockerfile文件时应尽可能的精简文件内容
+
 **ADD**
 
-ADD指令类似COPY指令，ADD支持使用tar文件和url路径，此指令似乎不支持使用"&&"语法
+ADD指令类似COPY指令，ADD支持使用tar文件和url路径，此指令似乎不支持使用"&&"语法。操作准则：
+1. COPY的文件复制准则在ADD中一样适用
+2. 如果源为url且目标路径不是目录，则源指定的url将被下载并直接重命名为目标文件；如果目标路径是目录，则源指定的url文件将会被下载到目标目录下
+3. 如果源是一个本地系统的压缩文件，它将会被展开为解压后的目录；通过url获取到的压缩文件则不会自动展开
+4. 有多个源目标或使用通配符时，目标路径必须是个目录，如果目标路径不以"/"结尾，则所有源文件的内容都会被直接写入目标文件
 
-操作准则：
-	COPY的文件复制准则在ADD中一样适用
-	如果源为url且目标路径不是目录，则源指定的url将被下载并直接重命名为目标文件；如果目标路径是目录，则源指定的url文件将会被下载到目标目录下
-	如果源是一个压缩文件，它将会被展开为解压后的目录；通过url获取到的压缩文件则不会自动展开
-	有多个源目标或使用通配符时，目标路径必须是个目录，如果目标路径不以"/"结尾，则所有源文件的内容都会被直接写入目标文件
-* 语法格式：
+语法格式：
+
 ```shell
 ADD <src> ... <dest> 或
 ADD ["<src>",... "<dest>"]
 ```
 
-#### WORKDIR
-* 为Dockerfile中所有的RUN、CMD、ENTRYPOINT、COPY和ADD指定工作目录。在Dockerfile中，WORKDIR指令可出现多次，其路径也可以为相对路径，不过相对路径是作用在此前一个WORKDIR指令指定的路径之上的
-* 语法格式
+**WORKDIR**
+
+为Dockerfile中所有的RUN、CMD、ENTRYPOINT、COPY和ADD指定工作目录。在Dockerfile中，WORKDIR指令可出现多次，其路径也可以为相对路径，不过相对路径是作用在此前一个WORKDIR指令指定的路径之上的。WORKDIR指令的每一次重新指定都只会影响在其之后的指令，另外，WORKDIR也可调用由ENV定义的变量。语法格式：
+
 ```shell
 WORKDIR $PATH
 WORKDIR /var/log
 ```
 
-#### VOLUME
-* 用于在镜像中创建一个挂载卷，但在Dockerfile中只能使用docker-managed volume
-* 语法格式
+**VOLUME**
+
+用于在镜像中创建一个挂载卷，但在Dockerfile中只能使用docker-managed volume，无法指定bind mount volume。语法格式：
+
 ```shell
 VOLUME <mountpoint> 或
 VOLUME ["<mountpoint>"]
