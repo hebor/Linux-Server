@@ -139,40 +139,65 @@ VOLUME <mountpoint> 或
 VOLUME ["<mountpoint>"]
 ```
 
-#### EXPOSE
-* 用于为容器打开指定要监听的端口，EXPOSE只能指定容器要开放的端口，使用随机高端口的方式映射到宿主机，不能直接指定映射到宿主机的端口。默认启动容器时指定的端口不会暴露，需要通过-P选项手动暴露端口
-* 语法格式
+**EXPOSE**
+
+用于为容器打开指定要监听的端口，EXPOSE只能指定容器要开放的端口，使用随机高端口的方式映射到宿主机，不能直接指定映射到宿主机的端口。出于安全性考量，即便在镜像文件中有写入指定要暴露的端口，默认启动容器时指定的端口仍不会暴露，需要通过-P选项手动暴露端口，<protocol>用于指定传输协议，可为tcp和udp二选一，默认为tcp协议。语法格式：
+
 ```shell
 EXPOSE <port>[/<protocol>] [<port>[/<protocol>] ...]
 EXPOSE 11211/udp 11211/tcp
 ```
 
-#### ENV
-* 用于为镜像定义所需要的环境变量，可被Dockerfile文件后续的其他指令调用，调用格式为$variable_name或${variable_name}
-* 语法格式
+**ENV**
+
+用于为镜像定义所需要的环境变量，可被Dockerfile文件中位于其后的其他指令调用，例如ENV（嵌套调用）、ADD、COPY等，调用格式为$variable_name或${variable_name}。语法格式：
+
 ```shell
 ENV <key> <value> 或    #此格式中，<key>之后的所有内容都被视为<value>的组成，所以一次只能设置一个变量
-ENV "<key>=<value>"    #此格式可一次设置多个变量，每个变量通过键值对的方式表现为"<key>=<value>"，如果<value>中包含空格，可以用\转义或对其加引号进行标识，反斜线也可用于换行
+ENV "<key>=<value>"    #此格式可一次设置多个变量，每个变量通过键值对的方式表现为"<key>=<value>"，如果<value>中包含空格，可以用\转义或对其加引号进行标识，一个指令定义多个变量时也可以通过反斜线换行来展示的更具条理性
 ```
 
-补充：docker run和docker build的区别
-镜像构建和启动容器是两个不同的过程，如果在Dockerfile文件中设置ENV环境变量，在docker run时能否执行变量替换
+**docker run和docker build的关系**
+
+Dockerfile示例文件
+
+```shell
+# Description： first Dockerfile
+FROM busybox:latest
+#MAINTAINER "HeBor <hebo1248@163.com>"
+LABEL maintainer="hebor <hebo1248@163.com>"
+ENV Doc_Root=/data/web/html/ \
+	Web_Server_Package="nginx-1.25.2"
+COPY index.html ${Doc_Root:-/data/web/html/}
+COPY yum.repos.d /etc/yum.repos.d/
+WORKDIR /usr/local/
+ADD ${Web_Server_Package}.tar.gz ./nginx/
+VOLUME /data/volume/
+EXPOSE 80/tcp
+```
+
+执行`docker container run -e`和`docker build`的时候都是可以向变量传值的，但启动容器和镜像构建是两个不同的阶段，在Dockerfile文件中设置ENV环境变量，它将在`docker build`阶段执行，而在docker run时也能够执行变量替换，但`docker run`传参只是修改环境变量，它并不能修改`docker build`时已经执行完成的值
+
+以上例Dockerfile文件为例，其中ADD指令在build的过程中就已经将nginx的源码包解压到了指定目录，即便在run的过程中修改`${Web_Server_Package}`nginx源码包的版本，也无法更改已经解压的nginx文件
+
 ```shell
 Dockerfile  docker build构建镜像             docker run启动容器
-文件       ----------------------> 镜像文件 --------------------> 容器
+   文件    ----------------------> 镜像文件 --------------------> 容器
 ```
-解析：Dockerfile中定义的所有环境变量是容器启动以后可以直接在容器中引用的变量，docker build的过程中已经将Dockerfile中的传参做成了只读镜像，启动容器时可以向容器内传参以修改环境变量，但docker run传参只是显示环境变量已修改，并不会修改docker build的值 <br />
-docker build的过程中已经将环境变量的值做成了只读镜像，docker run只是在容器的读写层修改了环境变量，并覆盖了只读镜像的环境变量
 
-#### RUN
-* 用于指定**docker build过程中**运行的程序，可以是任何命令，但使用的命令在基础镜像中必须存在，RUN命令也可以运行多次，建议使用换行符一行执行多条命令
-* 语法格式
+Dockerfile中定义的所有环境变量是容器启动以后可以直接在容器中引用的变量，`docker build`的过程中已经将Dockerfile中的传参做成了只读镜像，启动容器时可以向容器内传参以修改环境变量，但`docker run`传参只是显示环境变量已修改，它并不会修改`docker build`已经产生的结果，`docker build`的过程中已经将环境变量的值做成了只读镜像，`docker run`只是在容器的读写层修改了环境变量，并覆盖了只读镜像的环境变量
+
+**RUN**
+
+用于指定**docker build过程中**运行的程序，可以是任何命令，但使用的命令在基础镜像中必须存在，RUN命令也可以运行多次，建议使用换行符一行执行多条命令。语法格式：
+
 ```shell
 RUN <command> 或
 RUN ["<executable>","<param1>","<param2>"]
 ```
-* 第一种格式中，<command>通常是一个shell命令，以"/bin/sh -c"来运行一个进程，这意味着此进程在容器中PID不为1，不能接收Unix信号，因此，当使用docker stop <container>命令停止容器时，此进程接收不到SIGTERM信号
-* 第二种语法格式的参数是一个json数组，<executable>是要运行的命令，<paramN>作为传递给命令的选项或参数；这种格式的命令不会以"/bin/sh -c"来发起，因此常见的shell操作如变量替换以及通配符替换将不会运行
+
+- 第一种格式中，<command>通常是一个shell命令，以"/bin/sh -c"来运行一个进程，这意味着此进程在容器中PID不为1，不能接收Unix信号，因此，当使用docker stop <container>命令停止容器时，此进程接收不到SIGTERM信号
+- 第二种语法格式的参数是一个json数组，<executable>是要运行的命令，<paramN>作为传递给命令的选项或参数；这种格式的命令不会以"/bin/sh -c"来发起，因此常见的shell操作如变量替换以及通配符替换将不会运行
 
 补充：在Linux系统下运行一个服务或程序时，其父进程一定会是shell，所有进程在被终止时一定会将其下的所有子进程一并终止，shell也是如此。而想要不被终止则只能绕过shell，直接通过内核启动程序(nohub command)，直接通过内核启动的程序不会自动释放内存，也不会随着shell的终止而自动终止，但通过内核直接启动程序却不能使用通配符、管道、重定向等功能，因为这些功能是由shell提供的特性 <br />
 回到容器，docker的核心理念是一个容器只运行一个进程。而这个进程是直接通过内核启动还是通过shell托管就非常关键，通过容器启动一个进程时，这个进程在整个namespaces中进程号为1，也就是说这个进程由内核启动，所以在命令上就不能使用shell特性，Dockerfile中的RUN命令中的两种语法格式就代表两种启动程序的方式 <br />
