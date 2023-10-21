@@ -32,7 +32,9 @@ DockerFile文件只有2种格式，一种是以“#”号开头的注释，另�
 
 ## DockerFile构建指令集
 
-**FROM**
+指令集锚点：<a href="#from">FROM</a>、<a href="#maintainer">MAINTAINER</a>、<a href="#label">LABEL</a>、<a href="#copy">COPY</a>、<a href="#add">ADD</a>、<a href="#workdir">WORKDIR</a>、<a href="#volume">VOLUME</a>、<a href="#expose">EXPOSE</a>、<a href="#env">ENV</a>、<a href="#run">RUN</a>、<a href="#cmd">CMD</a>、<a href="#entrypoint">ENTRYPOINT</a>、<a href="#user">USER</a>
+
+<span id="from">**FROM**</span>
 
 FROM指令是最重要的一个指令且必须为Dockerfile文件第一个非注释行，用于为镜像文件构建过程中指定基准镜像，后续的指令运行基于此基准镜像提供的运行环境。基准镜像可以是任何可用镜像文件，默认情况下，docker build会在docker主机上查找指定的基础镜像文件，主机上不存在时会从Docker Hub Registry下载基础镜像，如果找不到指定的镜像，docker build会返回错误信息
 
@@ -45,7 +47,7 @@ FROM <repository>@<digest>
 	repository：默认使用dockerhub的镜像，也可以指定别的registry
 ```
 
-**MAINTAINER（已废弃，被兼容）**
+<span id="maintainer">**MAINTAINER（已废弃，被兼容）**</span>
 
 用于让Dockerfile制作者提供本人信息，Dockerfile不限制MAINTAINER出现的位置，但推荐将其放在FROM指令之后 
 
@@ -55,7 +57,7 @@ FROM <repository>@<digest>
 MAINTAINER "hebor <hebo1248@163.com>"
 ```
 
-**LABEL**
+<span id="label">**LABEL**</span>
 
 LABEL为镜像指定元数据，LABEL使用键值对的表现形式，MAINTAINER可以通过LABEL实现。LABEL能够提供各种各样的key:value信息，MAINTAINER只是其中一项，所以LABEL比MAINTAINER具备更广泛的应用场景
 
@@ -66,7 +68,7 @@ LABEL <key>=<value> <key>=<value> ...
 LABEL maintainer="hebo1248@163.com"
 ```
 
-**COPY**
+<span id="copy">**COPY**</span>
 
 用于从宿主机复制文件到构建的新镜像文件中，源文件路径一般是相对路径，支持使用通配符，目标路径建议使用绝对路径，否则目标路径会以WORKDIR为跟路径。文件复制准则如下
 
@@ -106,7 +108,7 @@ docker container run --rm http:v0.1 cat /data/web/html/index.html
 
 在Dockerfile文件中，同一个指令可以出现多次多行，但每一条指令都会生成一个新的镜像层，所以在编写Dockerfile文件时应尽可能的精简文件内容
 
-**ADD**
+<span id="add">**ADD**</span>
 
 ADD指令类似COPY指令，ADD支持使用tar文件和url路径，此指令似乎不支持使用"&&"语法。操作准则：
 1. COPY的文件复制准则在ADD中一样适用
@@ -121,7 +123,7 @@ ADD <src> ... <dest> 或
 ADD ["<src>",... "<dest>"]
 ```
 
-**WORKDIR**
+<span id="workdir">**WORKDIR**</span>
 
 为Dockerfile中所有的RUN、CMD、ENTRYPOINT、COPY和ADD指定工作目录。在Dockerfile中，WORKDIR指令可出现多次，其路径也可以为相对路径，不过相对路径是作用在此前一个WORKDIR指令指定的路径之上的。WORKDIR指令的每一次重新指定都只会影响在其之后的指令，另外，WORKDIR也可调用由ENV定义的变量。语法格式：
 
@@ -130,7 +132,7 @@ WORKDIR $PATH
 WORKDIR /var/log
 ```
 
-**VOLUME**
+<span id="volume">**VOLUME**</span>
 
 用于在镜像中创建一个挂载卷，但在Dockerfile中只能使用docker-managed volume，无法指定bind mount volume。语法格式：
 
@@ -139,7 +141,7 @@ VOLUME <mountpoint> 或
 VOLUME ["<mountpoint>"]
 ```
 
-**EXPOSE**
+<span id="expose">**EXPOSE**</span>
 
 用于为容器打开指定要监听的端口，EXPOSE只能指定容器要开放的端口，使用随机高端口的方式映射到宿主机，不能直接指定映射到宿主机的端口。出于安全性考量，即便在镜像文件中有写入指定要暴露的端口，默认启动容器时指定的端口仍不会暴露，需要通过-P选项手动暴露端口，<protocol>用于指定传输协议，可为tcp和udp二选一，默认为tcp协议。语法格式：
 
@@ -148,7 +150,7 @@ EXPOSE <port>[/<protocol>] [<port>[/<protocol>] ...]
 EXPOSE 11211/udp 11211/tcp
 ```
 
-**ENV**
+<span id="env">**ENV**</span>
 
 用于为镜像定义所需要的环境变量，可被Dockerfile文件中位于其后的其他指令调用，例如ENV（嵌套调用）、ADD、COPY等，调用格式为$variable_name或${variable_name}。语法格式：
 
@@ -187,25 +189,27 @@ Dockerfile  docker build构建镜像             docker run启动容器
 
 Dockerfile中定义的所有环境变量是容器启动以后可以直接在容器中引用的变量，`docker build`的过程中已经将Dockerfile中的传参做成了只读镜像，启动容器时可以向容器内传参以修改环境变量，但`docker run`传参只是显示环境变量已修改，它并不会修改`docker build`已经产生的结果，`docker build`的过程中已经将环境变量的值做成了只读镜像，`docker run`只是在容器的读写层修改了环境变量，并覆盖了只读镜像的环境变量
 
-**RUN**
+<span id="run">**RUN**</span>
 
-用于指定**docker build过程中**运行的程序，可以是任何命令，但使用的命令在基础镜像中必须存在，RUN命令也可以运行多次，建议使用换行符一行执行多条命令。语法格式：
+用于指定**docker build过程中**运行的程序，可以是任何命令，但使用的命令在基础镜像中必须存在，对比CMD指令，在Dockerfile文件中可以存在多个RUN指令，并逐一运行RUN指令，建议使用换行符一行执行多条命令。语法格式：
 
 ```shell
 RUN <command> 或
 RUN ["<executable>","<param1>","<param2>"]
 ```
 
-- 第一种格式中，<command>通常是一个shell命令，以"/bin/sh -c"来运行一个进程，这意味着此进程在容器中PID不为1，不能接收Unix信号，因此，当使用docker stop <container>命令停止容器时，此进程接收不到SIGTERM信号
-- 第二种语法格式的参数是一个json数组，<executable>是要运行的命令，<paramN>作为传递给命令的选项或参数；这种格式的命令不会以"/bin/sh -c"来发起，因此常见的shell操作如变量替换以及通配符替换将不会运行
+- 第一种格式中，<command>通常是一个shell命令，系统默认会将<command>认为是shell的子命令并以"/bin/sh -c"来运行它，这意味着此进程在容器中PID不为1，不能接收Unix信号，因此，当使用docker stop <container>命令停止容器时，此进程接收不到SIGTERM信号，为了确保该容器能够自动接收UNIX信号，容器会自动执行exec将启动的进程的PID切换为1
+- 第二种语法格式的参数是一个json数组，<executable>是要运行的命令，<paramN>作为传递给命令的选项或参数；这种格式的命令不会以"/bin/sh -c"来发起，它直接由内核创建，因此常见的shell操作如变量替换以及通配符替换将会不支持。如果要运行的命令需要依赖shell特性，也可以通过手动启动shell进程的方式实现：RUN ["/bin/bash", "-c", "<executable>", "<param1>"]
 
-补充：在Linux系统下运行一个服务或程序时，其父进程一定会是shell，所有进程在被终止时一定会将其下的所有子进程一并终止，shell也是如此。而想要不被终止则只能绕过shell，直接通过内核启动程序(nohub command)，直接通过内核启动的程序不会自动释放内存，也不会随着shell的终止而自动终止，但通过内核直接启动程序却不能使用通配符、管道、重定向等功能，因为这些功能是由shell提供的特性 <br />
-回到容器，docker的核心理念是一个容器只运行一个进程。而这个进程是直接通过内核启动还是通过shell托管就非常关键，通过容器启动一个进程时，这个进程在整个namespaces中进程号为1，也就是说这个进程由内核启动，所以在命令上就不能使用shell特性，Dockerfile中的RUN命令中的两种语法格式就代表两种启动程序的方式 <br />
-启动容器时，如果既想以shell的方式启动进程，又不想shell作为pid号为1的进程，那就需要使用exec启动新的进程来覆盖掉shell进程。使用exec进入已启动的容器后再使用ps命令查看进程时，shell进程的pid依旧为1，这是为了确保容器能够自动接收UNIX信号，但从使用exec命令进入容器的那一刻起，就说明exec命令确实已经替换掉了容器中的主进程
+在Linux系统下运行一个服务或程序时，其父进程一定会是shell，所有进程在被终止时一定会将其下的所有子进程一并终止，shell也是如此。而想要不被终止则只能绕过shell，直接通过内核启动程序（nohub command），直接通过内核启动的程序不会自动释放内存，也不会随着shell的终止而自动终止，但通过内核直接启动程序却不能使用通配符、管道、重定向等功能，因为这些功能是由shell提供的特性
 
-**CMD**
+回到容器，docker的核心理念是一个容器只运行一个进程。而这个进程是直接通过内核启动还是通过shell托管就非常关键，通过容器启动一个进程时，这个进程在整个namespaces中进程号为1，也就是说这个进程由内核启动，所以在命令上就不能使用shell特性，Dockerfile中的RUN命令中的两种语法格式就代表两种启动程序的方式 
 
-用于指定**docker run过程中**运行的命令，即启动容器时默认要运行的程序，容器默认只运行一个程序，所以虽然CMD可以出现多次，但只有最后一个生效。CMD指定的命令可以被docker run的命令行指定的命令覆盖。语法格式
+启动容器时，如果默认是以shell的方式启动进程，为了确保该容器能够自动接收UNIX信号，容器会自动执行exec将启动的进程的PID切换为1。以`CMD /bin/httpd -f -h /data/web/html/`为例，制作的镜像文件默认会以shell子进程的方式启动httpd服务，使用exec进入已启动的容器后再使用ps命令查看进程时，会发现httpd进程的PID为1，但通过inspect查看镜像或容器详细信息，都能够确认httpd是shell的子进程。确保该容器能够自动接收UNIX信号，是为了管理员在宿主机命令行执行docker stop、docker kill等命令时，容器能够接收到信号并作出相应动作
+
+<span id="cmd">**CMD**</span>
+
+用于指定**docker run过程中**运行的命令，即启动容器时默认要运行的程序，容器默认只运行一个程序，基于这个特性，即便CMD指令可以在Dockerfile文件中出现多次，但只有最后一个生效。CMD指定的命令可以被docker run的命令行指定的命令覆盖。语法格式：
 
 ```shell
 CMD <command> 或
@@ -213,22 +217,29 @@ CMD ["<executable>","<param1>","<param2>"] 或	#前两种语法格式要求与CM
 CMD ["<param1>","<param2>"]		#此语法则用于为ENTRYPOINT指令提供默认参数
 ```
 
-#### ENTRYPOINT
-* 类似CMD指令的功能，为容器指定默认运行程序，但ENTRYPOINT启动的程序不会被docker run命令行指定的参数覆盖，但这些**命令行参数**会覆盖CMD指令的内容，并会附加到ENTRYPOINT指定的应用程序后作为其**参数**使用。不过docker run命令的--entrypoint选项可覆盖ENTRYPOINT指令指定的程序
-* 语法格式
+使用CMD的第二种语法格式时需要注意参数的次序位置不能混乱，因为启动容器时读取执行参数也是按照位置次序依次读取执行的
+
+CMD指令与RUN指令对比，两者运行的时间阶段不同，RUN指令运行于构建镜像文件的过程，CMD指令运行于启动容器的过程
+
+<span id="entrypoint">**ENTRYPOINT**</span>
+
+类似CMD指令的功能，为容器指定默认运行程序，但ENTRYPOINT启动的程序不会被docker run命令行指定的参数覆盖，但这些**命令行参数**会覆盖CMD指令的内容，并会附加到ENTRYPOINT指定的应用程序后作为其**参数**使用。不过docker run命令的--entrypoint选项可覆盖ENTRYPOINT指令指定的程序。 语法格式：
+
 ```shell
 ENTRYPOINT <command>
 ENTRYPOINT ["<executable>","<param1>","<param2>"]
 ```
 
-#### USER
-* 用于指定运行镜像时或运行Dockerfile中任何RUN、CMD或ENTRYPOINT指令指定的程序时的用户名或UID。默认容器运行身份为root
-* 语法格式
+<span id="user">**USER**</span>
+
+用于指定运行镜像时或运行Dockerfile中任何RUN、CMD或ENTRYPOINT指令指定的程序时的用户名或UID。默认容器运行身份为root。语法格式：
+
 ```shell
 USER <UID>|<UserName>	#UID必须是/etc/passwd中已存在的用户
 ```
 
 #### HEALTHCHECK
+
 * docker判断容器正常与否并不是判断容器内进程是否正常提供服务，而是仅判断容器进程是否运行。这种判定机制并不能真正的判断容器是否正常，此时需要用一些工具去测试服务是否正常，比如curl、wget。HEALTHCHECK指令用于指定一条CMD命令，这条命令用于检查主进程服务状态
 * 语法格式
 ```shell
