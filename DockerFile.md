@@ -32,7 +32,7 @@ DockerFile文件只有2种格式，一种是以“#”号开头的注释，另�
 
 ## DockerFile构建指令集
 
-指令集锚点：<a href="#from">FROM</a>、<a href="#maintainer">MAINTAINER</a>、<a href="#label">LABEL</a>、<a href="#copy">COPY</a>、<a href="#add">ADD</a>、<a href="#workdir">WORKDIR</a>、<a href="#volume">VOLUME</a>、<a href="#expose">EXPOSE</a>、<a href="#env">ENV</a>、<a href="#run">RUN</a>、<a href="#cmd">CMD</a>、<a href="#entrypoint">ENTRYPOINT</a>、<a href="#user">USER</a>
+指令集锚点：<a href="#from">FROM</a>、<a href="#maintainer">MAINTAINER</a>、<a href="#label">LABEL</a>、<a href="#copy">COPY</a>、<a href="#add">ADD</a>、<a href="#workdir">WORKDIR</a>、<a href="#volume">VOLUME</a>、<a href="#expose">EXPOSE</a>、<a href="#env">ENV</a>、<a href="#run">RUN</a>、<a href="#cmd">CMD</a>、<a href="#entrypoint">ENTRYPOINT</a>、<a href="#user">USER</a>、<a href="#healthcheck">HEALTHCHECK</a>、<a href="#shell">SHELL</a>、<a href="#arg">ARG</a>、<a href="#onbuild">ONBUILD</a>
 
 <span id="from">**FROM**</span>
 
@@ -106,7 +106,7 @@ docker container run --rm http:v0.1 cat /data/web/html/index.html
 	#启动容器，仅执行cat命令，退出删除容器。这种方式会改变镜像原本要运行的默认主程序，执行完cat命令后就会退出容器
 ```
 
-在Dockerfile文件中，同一个指令可以出现多次多行，但每一条指令都会生成一个新的镜像层，所以在编写Dockerfile文件时应尽可能的精简文件内容
+构建Dockerfile文件时，同一个指令可以出现多次多行，但每一条指令都会生成一个新的镜像层，所以在编写Dockerfile文件时应尽可能的精简文件内容，过多的行数会导致镜像臃肿
 
 <span id="add">**ADD**</span>
 
@@ -223,30 +223,71 @@ CMD指令与RUN指令对比，两者运行的时间阶段不同，RUN指令运�
 
 <span id="entrypoint">**ENTRYPOINT**</span>
 
-类似CMD指令的功能，为容器指定默认运行程序，但ENTRYPOINT启动的程序不会被docker run命令行指定的参数覆盖，但这些**命令行参数**会覆盖CMD指令的内容，并会附加到ENTRYPOINT指定的应用程序后作为其**参数**使用。不过docker run命令的--entrypoint选项可覆盖ENTRYPOINT指令指定的程序。 语法格式：
+类似CMD指令的功能，为容器指定默认运行程序，但ENTRYPOINT启动的程序不会被docker run命令行指定的参数覆盖，但这些**命令行参数**会覆盖CMD指令的内容，并会附加到ENTRYPOINT指定的应用程序后作为其**参数**使用，这句话有两种理解，如果ENTRYPOINT指定的命令能够识别docker run命令传递的“参数”，则命令正常执行；如果ENTRYPOINT指定的命令无法识别docker run命令传递的“参数”，则不予处理。不过docker run命令的--entrypoint选项可覆盖ENTRYPOINT指令指定的程序
+
+以`ENTRYPOINT /bin/httpd -f -h /data/web/html/`指令为例，此前执行docker run时可以在指定镜像后追加需要执行的命令，在命令行追加的命令优先级高于CMD，此前也是由于CMD的特性，命令行追加的命令执行都没有问题，但在ENTRYPOINT指令下追加命令，例如docker run时追加`ls /data/web/html/`命令，这条命令会被视作ENTRYPOINT指令的“参数”，但由于httpd命令无法识别这个参数，所以不做任何处理
+
+当DockerFile文件中同时存在CMD和ENTRYPOINT指令时，CMD的所有命令都将作为ENTRYPOINT的参数，这也是CMD第三种语法格式所表达的意义。ENTRYPOINT语法格式：
 
 ```shell
 ENTRYPOINT <command>
 ENTRYPOINT ["<executable>","<param1>","<param2>"]
 ```
 
+注：在DockerFile文件中编辑ENTRYPOINT指令时需要注意引号的使用，只能使用双引号；JSON数组都应该使用双引号
+
+**ENTRYPOINT示例**
+
+```shell
+mkdir /srv/img2		#新建工作目录
+vim /srv/img2/index.html	#新建测试网页文件
+<h1>New test img2 page<h1>
+
+vim /srv/img2/entrypoint.sh
+#!/bin/sh
+cat > /etc/nginx/conf.d/www.conf << EOF
+server {
+        server_name ${HOSTNAME};	#监听的参数基本都以变量的形式表示
+        listen ${IP:-0.0.0.0}:${PORT:-80};	#设置默认的参数值，启动容器时未定义变量值则引用默认值
+        root ${NGX_DOC_ROOT:-/usr/share/nginx/html};
+}
+EOF
+exec "$@"	#通过exec命令运行参数
+chmod +x /srv/img2/entrypoint.sh	#赋予脚本可执行权限
+
+vim /srv/img2/Dockerfile	#通过DockerFile定义启动容器的方式，以一个shell脚本文件启动容器
+FROM nginx:latest	#基于nginx镜像
+LABEL maintainer="<hebo1248@163.com>"
+ENV NGX_DOC_ROOT="/usr/share/nginx/html/"
+ADD index.html ${NGX_DOC_ROOT}	#拷贝网页测试文件
+ADD entrypoint.sh /bin/		#拷贝执行脚本
+CMD ["/usr/sbin/nginx","-g","daemon off;"]
+ENTRYPOINT ["/bin/entrypoint.sh"]
+
+docker container run --name img2v1 --rm -e "PORT=8080" img2:v1	#通过环境变量传递变量值，这将使启动容器时监听80和8080端口
+```
+
+基于entrypoint.sh脚本启动的容器，即便再另外使用exec进入容器内查看PID为1的进程仍是nginx，因为在entrypoint.sh脚本的末尾手动使用了exec命令切换nginx为容器主进程
+
 <span id="user">**USER**</span>
 
-用于指定运行镜像时或运行Dockerfile中任何RUN、CMD或ENTRYPOINT指令指定的程序时的用户名或UID。默认容器运行身份为root。语法格式：
+用于指定运行镜像时或运行Dockerfile中任何RUN、CMD或ENTRYPOINT指令指定的程序时的用户名或UID，默认容器运行身份为root。语法格式：
 
 ```shell
 USER <UID>|<UserName>	#UID必须是/etc/passwd中已存在的用户
 ```
 
-#### HEALTHCHECK
+<span id="healthcheck">**HEALTHCHECK**</span>
 
-* docker判断容器正常与否并不是判断容器内进程是否正常提供服务，而是仅判断容器进程是否运行。这种判定机制并不能真正的判断容器是否正常，此时需要用一些工具去测试服务是否正常，比如curl、wget。HEALTHCHECK指令用于指定一条CMD命令，这条命令用于检查主进程服务状态
-* 语法格式
+docker判断容器正常与否并不是判断容器内进程是否正常提供服务，而是仅判断容器进程是否运行。这种判定机制并不能真正的判断容器是否正常，此时需要用一些工具去测试服务是否正常，比如curl、wget。HEALTHCHECK指令用于指定一条CMD命令，这条命令用于检查主进程服务状态。语法格式：
+
 ```shell
 HEALTHCHECK [OPTIONS] CMD command	#CMD是关键词，不可少
 HEALTHCHECK NONE	#不使用健康检查，会关闭默认的健康检查
 ```
+
 HEALTHCHECK属于周期性任务，所以会有OPTIONS：
+
 ```shell
 --interval=DURATION(default:30s)	#检测间隔时间
 --timeout=DURATION(default:30s)		#服务未响应超时时间
@@ -254,35 +295,52 @@ HEALTHCHECK属于周期性任务，所以会有OPTIONS：
 --retries=N(default:3)				#检测次数
 ```
 
-#### SHELL
-* 用于指定运行程序使用的shell，Linux默认shell为["/bin/sh","-c"]，Windows默认shell为["cmd","\S","\C"]
+HEALTHCHECK示例与返回值解析
 
-#### STOPSIGNAL
-* 容器内PID为1的进程可以接收Linux的信号，默认信号是15，也就是终止程序。此信号可修改，比如修改为9，修改后docker stop容器进程收到的信号就是强制终止
-* 语法格式
+```shell
+0：success
+1：unhealthy，不健康，HEALTHCHECK检测结果为不健康时不输出任何信息，等待默认的超时时间和检测次数后输出错误提示
+2：reserved，预留值
+
+示例:HEALTHCHECK --interval=5m --timeout=3s \
+		CMD curl -f http://localhost/ || exit 1		#curl失败时访问错误码1
+```
+
+<span id="shell">**SHELL**</span>
+
+用于指定运行程序使用的shell，Linux默认shell为["/bin/sh","-c"]，Windows默认shell为["cmd","\S","\C"]。只有在运行windows或系统具有更好的shell程序时，另外定义shell指令是没有问题的，否则使用/bin/sh即可，此指令一般不会使用。语法格式：
+
+```shell
+SHELL ["executable","parameters"]
+```
+
+<span id="shell">**STOPSIGNAL**</span>
+
+容器内PID为1的进程可以接收docker stop命令，从而能停止主进程，停止主进程就意味着停止容器，stop命令相当于向容器发送了15的默认信号，也就是终止程序。此信号可修改，比如修改为9，修改后docker stop容器进程收到的信号就是强制终止。语法格式：
+
 ```shell
 STOPSIGNAL signal	#修改容器主进程可以接收的信号
 ```
 
-#### ARG
-* 定义只在build的过程中使用的变量，且能在执行docker build命令时，通过选项--build-arg <varname>=<value>向biuld过程中传参
-* 语法格式
+<span id="arg">**ARG**</span>
+
+定义只在build的过程中使用的变量，且能在执行docker build命令时，通过选项`--build-arg <varname>=<value>`向biuld过程中传参。语法格式：
+
 ```shell
 ARG <name>[=<default value>]	#此处可以不定义默认值，docker build时传参即可
 ```
 
-#### ONBUILD
-* 在Dockerfile中定义一个触发器，自己在docker build基于此Dockerfile制作的镜像时没有问题，但制作的镜像如果被他人FROM引用做基础镜像时，在他人docker build的过程中会执行此触发器
-* 语法格式
+ARG与ENV指令的作用相似，都可以向DockerFIle文件中的变量传参，只不过两者作用的阶段不同，docker build的过程中无法使用ENV传参，只能通过ARG修改变量
+
+<span id="onbuild">**ONBUILD**</span>
+
+ONBUILD又称延时执行，它在Dockerfile中定义一个触发器，该指令在首次使用docker build制作镜像的过程中不会生效，但如果该镜像又被他人FROM引用再次做为基础镜像时，在二次docker build的过程中会执行此触发器。语法格式：
+
 ```shell
 ONBUILD <INSTRUCTION>	#INSTRUCTION可以是RUN、CMD或ADD等
 ONBUILD ADD http://mirrors.aliyun.com/repo/Centos-7.repo
 ```
-* 几乎任何指令都可以成为触发器指令，但ONBUILD不能自我嵌套，且不会出发FROM和MAINTAINER指令，使用包含ONBUILD指令的Dockerfile构建的镜像应该使用特殊的标签进行声明。在ONBUILD指令中使用ADD或COPY指令时应注意，新构建过程的上下文在缺少指定的源文件时会失败
-
-```diff
-- 构建Dockerfile文件时应尽量减少文件行数，因为构建镜像时每一行就是一层镜像，过多的行数会导致镜像臃肿
-```
+几乎任何指令都可以成为触发器指令，但ONBUILD不能自我嵌套，且不会触发FROM和MAINTAINER指令，使用包含ONBUILD指令的Dockerfile构建的镜像应该使用特殊的标签进行声明。在ONBUILD指令中使用ADD或COPY指令时应注意，新构建过程的上下文在缺少指定的源文件时会失败
 
 ### 向容器中传参
 示例：Dockerfile文件内容
