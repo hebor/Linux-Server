@@ -248,7 +248,7 @@ Docker的镜像并不是传统的iso镜像，其每个镜像都分成了许多�
 
 位于下层的镜像称为父镜像，最底层的称为基础镜像(base image)，它通常用来供给一个系统的基本构成；注意，bootfs在容器启动时，一旦rootfs被引导完之后，bootfs会从内存中被移除，但不是被删除
 
-#### Docker Registry分类
+#### <span id="registry">Docker Registry分类</span>
 
 启动容器时，Docker Daemon会尝试从本地获取相关镜像，本地镜像不存在时将从Registry中下载该镜像保存到本地，默认情况下会从dockerhub下载镜像，如果想下载其他Registry的镜像，则拉取镜像时必须写明Registry服务器地址和相关镜像名
 
@@ -608,30 +608,48 @@ docker container run --name box4 --rm -it --network container:box1 --volumes-fro
 
 共享网络和存储卷的方式可以实现多个容器组合对外提供服务，仅需一个容器对外提供接口，例如nginx容器，其他容器可以监听本地socket接口，例如tomcat或数据库服务，存储卷能够更好的实现对容器的管理和数据的持久保存
 
-private registry
-================
+# private registry
 
-docker默认拒绝使用http访问registry，为了快速创建私有registry，docker专门提供的一个程序包：docker-distribution，且在dockerhub上也有registry的容器仓库，运行registry容器必须为其定义一个存储卷，且此存储卷应该时共享存储。
+Registry用于保存docker镜像，包括镜像的层次结构和元数据，用户可自建Registry，也可使用官方的dockerhub，此前内容中有提及过<a href="#registry">Registry的分类</a>。为了快速协助管理员创建private registry，docker专门提供的一个程序包：docker-distribution
+
+容器时代，几乎所有程序都可以运行在容器中，docker-distribution本身作为一个程序，自然也可以运行在docker容器中，在dockerhub上有registry的容器仓库。registry本身的作用是托管镜像，基于容器基本概念，将registry运行为容器时就必须为其定义一个存储卷，且此存储卷应该是共享存储
+
+除了在dockerhub上有registry的镜像，extras的yum仓库中同样提供有docker-registry的软件包，docker-distribution被包含在docker-registry中，docker-registry软件包的版本不等于docker-distribution的版本，docker-registry软件包的版本可能会比较低，docker-distribution的版本只有在安装docker-registry时才能看出来
+
 ```shell
-# yum install  docker-registry -y	#实际安装过程安装的还是docker-distribution包
-# rpm -ql docker-distribution		#查看配置文件路径、镜像存储路径、服务名称
-# vim /etc/docker-distribution/registry/config.yml	#修改镜像存储路径
-# systemctl start docker-distribution.service	#启动服务，默认使用5000端口
+yum info docker-registry	
+yum install  docker-registry -y	#实际安装过程安装的还是docker-distribution包
+rpm -ql docker-distribution		#查看配置文件路径、镜像存储路径、服务名称
+cat /etc/docker-distribution/registry/config.yml
+version: 0.1
+log:
+  fields:
+    service: registry
+storage:
+    cache:
+        layerinfo: inmemory		#缓存在内存中
+    filesystem:
+        rootdirectory: /var/lib/registry	#镜像存储路径
+http:
+    addr: :5000		#冒号中间为空表示服务监听本机所有地址的5000端口
+
+systemctl start docker-distribution.service		#启动服务
+docker image tag img2:v1 registry.example.com:5000/hebor/img2:v1
+docker image push registry.example.com:5000/hebor/img2:v1
 ```
-直接使用本地地址是可以上传镜像的，但如果非本地地址，又不是https协议，则需要修改/etc/docker/daemon.json文件
+
+为测试镜像重新打标签，上传到private registry时标签中需要包含registry服务器的地址、端口，一般private registry不会供外部用户使用，所以可以直接使用顶级仓库名，也就是可以省略用户名hebor。上传镜像时可以省略tag，这表示上传整个仓库内所有tag的镜像，此前用到的registry默认都是基于https协议工作的，这也是docker的基本要求，而自建的private registry大概率会在局域网中使用http协议工作，docker默认拒绝使用http访问registry，所以需要修改/etc/docker/daemon.json配置文件
+
 ```shell
-"insecure-registries": ["10.250.1.11:5000"]	#添加此行，IP地址可以更改为域名
+"insecure-registries": ["registry.example.com:5000"]	#声明可信任的registry，可使用IP或域名
 ```
-重启docker服务后，修改镜像仓库名称，上传镜像即可
 
-harbor
-------
+## harbor
 
-harbor的项目代码托管在github上，在安装harbor之前需要确认主机上已经安装了docker和docker-compose，确切的版本要求github上面也明确[要求](https://github.com/goharbor/harbor)了
-[harbor配置文件信息](https://goharbor.io/docs/2.0.0/install-config/configure-yml-file/)<br />
-配置文件中分为必要配置和可选配置，必要配置至少要修改主机名，可以选择性修改harbor的管理员密码和数据库密码，如果没有为https配置证书，那https的内容需要注释，否则会报错<br />
-[harbor脚本安装](https://goharbor.io/docs/2.0.0/install-config/run-installer-script/)<br />
-直接运行安装脚本即可，安装完成后查看端口是否开放
-```diff
-- harbor.yml文件中开放的端口号必须要与/etc/docker/daemon.json文件中的端口号相同，否则即便安装完成也无法登录web
-```
+docker官方提供的docker-distribution过于简陋，harbor是VMware基于docker-distribution二次开发的企业级产品，harbor具备更多的功能和优秀的web操作界面
+
+harbor的项目代码托管在github上，在安装harbor之前需要确认主机上已经安装了docker和docker-compose，确切的版本要求github上面也有明确[要求](https://github.com/goharbor/harbor)，[harbor配置文件信息](https://goharbor.io/docs/2.0.0/install-config/configure-yml-file/)
+
+配置文件中分为必要配置和可选配置，必要配置至少要修改主机名，可以选择性修改harbor的管理员密码和数据库密码，如果没有为https配置证书，那https的内容需要注释，否则会报错，[harbor脚本安装](https://goharbor.io/docs/2.0.0/install-config/run-installer-script/)，直接运行安装脚本即可，安装完成后查看端口是否开放
+
+harbor.yml文件中开放的端口号必须要与/etc/docker/daemon.json文件中的端口号相同，否则即便安装完成也无法登录web
