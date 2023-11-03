@@ -650,6 +650,9 @@ docker官方提供的docker-distribution过于简陋，harbor是VMware基于dock
 
 harbor的项目代码托管在github上，在安装harbor之前需要确认主机上已经安装了docker和docker-compose，确切的版本要求github上面也有明确[要求](https://github.com/goharbor/harbor)，[harbor 2.9.0安装配置文档](https://goharbor.io/docs/2.9.0/install-config/)
 
-配置文件中分为必要配置和可选配置，必要配置至少要修改主机名，可以选择性修改harbor的管理员密码和数据库密码，如果没有为https配置证书，那https的内容需要注释，否则会报错，[harbor脚本安装](https://goharbor.io/docs/2.0.0/install-config/run-installer-script/)，直接运行安装脚本即可，安装完成后查看端口是否开放
+配置文件中分为必要配置和可选配置，必要配置至少要修改主机名，可以选择性修改harbor的管理员密码和数据库密码，如果没有为https配置证书，那https的内容需要注释，否则会报错，[harbor 2.9.0安装脚本](https://goharbor.io/docs/2.9.0/install-config/configure-yml-file/)，直接运行安装脚本即可，安装完成后查看端口是否开放
 
-harbor.yml文件中开放的端口号必须要与/etc/docker/daemon.json文件中的端口号相同，否则即便安装完成也无法登录web
+harbor.yml文件中开放的端口号必须要与/etc/docker/daemon.json文件中指定的可信任的端口号相同，否则即便安装完成也无法登录harbor，更无法推送镜像。客户端修改registry地址需要登录，否则默认的registry就是dockerhub
+
+# Docker资源限制
+
