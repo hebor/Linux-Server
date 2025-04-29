@@ -51,7 +51,7 @@ Rsync是一款开源的快速增量备份工具，用于在不同的主机系统
    dont compress = *.gz *.tgz *.zip *.z *.Z *.rpm *.deb *.bz2    # 设置文件是否压缩；以.gz、.tgz等后缀结尾的文件不用压缩，其他文件都进行压缩
    port = 873    # Rsyncd守护进程监听的端口。Rsyncd守护进程缺省监听873/tcp端口
    log file = /var/log/rsyncd.log    # 设置Rsyncd的日志文件
-   address = 192.168.0.31    # Rsyncd守护进程监听的地址
+   address = 192.168.0.30    # Rsyncd守护进程监听的地址
    hosts allow = 192.168.0.0/24    # 允许指定主机进行数据同步
    
    [directory]    # 共享模块的名称。Rsync同步源向外发布的目录的名称，可自定义

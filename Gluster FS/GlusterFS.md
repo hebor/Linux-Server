@@ -232,7 +232,7 @@ GlusterFS支持多种卷类型，然而在GlusterFS的实际应用过程，某�
 
 #### 二、安装GlusterFS
 
-所有GlusterFS服务端都需要安装GlusterFS软件
+所有GlusterFS节点都需要安装GlusterFS软件
 
 1. 配置YUM源
 
@@ -250,20 +250,218 @@ GlusterFS支持多种卷类型，然而在GlusterFS的实际应用过程，某�
    	glusterfs-rdma：GlusterFS的专有网络类型；实验环境中不会使用到专有网络环境
    ```
 
+   如果CentOS7安装有图形界面，可能会在安装GlusterFS软件包的时候出现部分软件版本冲突的问题，此时可以尝试一下先`yum update -y`更新一下系统，再执行GlusterFS软件组的安装命令
+
+#### 三、启动与配置GlusterFS服务
+
+所有GlusterFS节点都需要启动GlusterFS服务，
+
+1. 启动GlusterFS服务
+
+   ```bash
+   systemctl enable --now glusterd
+   ```
+
+2. 添加GlusterFS节点；以下步骤仅需再任意一台GlusterFS节点上配置，类似于主节点的概念
+
+   ```bash
+   gluster peer probe storage-2
+   gluster peer probe storage-3
+   gluster peer probe storage-4
+   ```
+
+   通过主机名的方式添加GlusterFS节点，这需要借助DNS解析功能实现，`/etc/hosts`文件中配置有本地域名解析，因此可以直接使用主机名。不知道是否能够直接通过ip的方式添加节点
+
+3. 查看GlusterFS节点状态
+
+   ```bash
+   gluster peer status
+   ```
+
+#### 四、创建卷
+
+在创建卷之前，需要先将所有GlusterFS节点的硬盘格式化，并挂载到GlusterFS服务端的挂载点上，GlusterFS节点上的这个挂载点就是Brick。创建卷这个操作本身只需要在一个GlusterFS节点上执行即可
+
+1. 为GlusterFS节点创建分区
+
+   ```bash
+   parted /dev/sdb mklabel gpt mkpart primary 0 100%    # 整个硬盘只分一个区即可
+   partprobe /dev/sdb    # 重新扫描/dev/sdb的分区表
+   parted /dev/sdc mklabel gpt mkpart primary 0 100%
+   partprobe /dev/sdc
+   ```
+
+2. 为GlusterFS节点的分区格式化文件系统
+
+   ```bash
+   mkfs.xfs /dev/sdb1
+   mkfs.xfs /dev/sdc1
+   ```
+
+3. 在GlusterFS节点上挂载新硬盘
+
+   ```bash
+   mkdir /sdb
+   mkdir /sdc
+   vim /etc/fstab
+   /dev/sdb1	/sdb	xfs	defaults	0 0
+   /dev/sdc1	/sdc	xfs	defaults	0 0
+   mount -a    # 通过读取/etc/fstab配置文件实现自动挂载，也可以用于检测/etc/fstab配置文件是否有误
+   ```
+
+   此时，所有GlusterFS节点上各自都有两个Brick
+
+4. 创建分布式卷；仅在一个GlusterFS节点上创建即可
+
+   ```bash
+   gluster volume create dis-volume storage-1:/sdb storage-2:/sdb force
+   gluster volume start dis-volume    # 创建卷后，还需要启动卷才可以用于读写数据
+   ```
+
+   创建卷时既可以使用主机名，也可以直接使用IP地址
+
+5. 创建复制卷
+
+   ```bash
+   gluster volume create rep-volume replica 2 storage-3:/sdb storage-4:/sdb force
+   gluster volume start rep-volume
+   ```
+
+6. 创建分布式复制卷
+
+   ```bash
+   gluster volume create dis-rep replica 2 storage-1:/sdc storage-2:/sdc storage-3:/sdc storage-4:/sdc force
+   gluster volume start dis-rep
+   ```
+
+7. 查看卷的具体信息
+
+   ```bash
+   gluster volume info dis-volume
+   ```
+
+   每个卷都有其唯一的名称，即全局统一命名空间
+
+#### 五、部署GlusterFS客户端
+
+初始化环境步骤在客户端上同样需要执行一遍，主机名和hosts文件与服务端略有不同
+
+1. 修改主机名
+
+   ```bash
+   hostnamectl set-hostname client
+   ```
+
+2. 修改客户端的本地域名解析文件
+
+   ```bash
+   vim /etc/hosts
+   192.168.0.240	storage-1
+   192.168.0.241	storage-2
+   192.168.0.242	storage-3
+   192.168.0.243	storage-4
+   192.168.0.35	client
+   ```
+
+3. 安装GlusterFS客户端软件
+
+   ```bash
+   yum install -y centos-release-gluster
+   yum install -y glusterfs glusterfs-fuse    # 客户端仅需安装两个软件包
+   ```
+
+   安装GlusterFS软件组时需要注意服务端软件包与客户端软件包的版本关系，至少需要大版本号的同步
+
+4. 创建挂载目录
+
+   ```bash
+   mkdir /dis-volume /rep-volume /dis-rep
+   ```
+
+5. 挂载Gluster文件系统
+
+   ```bash
+   mount -t glusterfs storage-1:dis-volume /dis-volume
+   mount -t glusterfs storage-1:rep-volume /rep-volume
+   mount -t glusterfs storage-1:dis-rep /dis-rep
+   ```
+
+   在客户端上挂载GlusterFS存储时，使用`主机名:卷名`的书写格式，主机名可以是GlusterFS集群当中的任何一个节点
+
+6. 修改fstab配置文件
+
+   ```bash
+   vim /etc/fstab
    
+   ```
 
+7. 查看GlusterFS的挂载状态
 
-
-
-
-
-
-
-
-
-
-
-
-
+   ```bash
+   df -h
+   ```
 
 ## GlusterFS的维护与测试
+
+### 测试Gluster文件系统
+
+1. 卷中写入文件
+
+   ```bash
+   # 使用客户端创建文件
+   touch /dis-volume/{1..10}.txt
+   touch /rep-volume/{1..10}.txt
+   touch /dis-rep/{1..10}.txt
+   ```
+
+2. 查看文件分布
+
+   ```bash
+   # 在storage-1、storage-2节点中查看分布式卷的数据
+   ls /sdb
+   
+   # 在storage-3、storage-4节点中查看复制卷的数据
+   ls /sdb
+   
+   # 在所有GlusterFS服务端上查看分布式复制卷的数据
+   ls /sdc
+   ```
+
+3. 破坏性测试
+
+   关闭storage-1节点，在客户端上查看挂载点数据
+
+   ```bash
+   ls /dis-volume    # 分布式卷的部分数据会丢失
+   ls /rep-volume    # 复制卷的数据完整
+   ls /dis-rep       # 分布式复制卷的数据完整
+   ```
+
+### 其他维护命令
+
+1. 查看GlusterFS卷列表
+
+   ```bash
+   gluster volume list
+   gluster volume info dis-rep    # 查看某个卷的具体信息
+   ```
+
+2. 停止/删除卷
+
+   执行停止/删除卷操作之前，需要先确认该卷没有被任何客户端挂载中
+
+   ```bash
+   # 客户端取消挂载
+   umount /rep-volume
+   
+   # 停止复制卷
+   gluster volume stop rep-volume
+   gluster volume delete rep-volume
+
+3. 设置卷的访问控制
+
+   ```bash
+   gluster volume set dis-volume auth.allow 192.168.0.*    # 仅允许某个网段访问分布式卷
+   ```
+
+   
